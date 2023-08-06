@@ -8,31 +8,28 @@ import {
     Transaction as _Transaction,
 } from '@subsquid/evm-processor'
 
+export const BAYC_ADDRESS = '0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d'
+
 export const processor = new EvmBatchProcessor()
     .setDataSource({
-        // Change the Archive endpoints for run the squid
-        // against the other EVM networks
-        // For a full list of supported networks and config options
-        // see https://docs.subsquid.io/evm-indexing/
         archive: lookupArchive('eth-mainnet'),
-
-        // Must be set for RPC ingestion (https://docs.subsquid.io/evm-indexing/evm-processor/)
-        // OR to enable contract state queries (https://docs.subsquid.io/evm-indexing/query-state/)
-        chain: 'https://rpc.ankr.com/eth',
     })
-    .setFinalityConfirmation(75)
+    .setBlockRange({ from: 12_287_507 })
+    .addTrace({
+        type: ['call'],
+        callTo: [BAYC_ADDRESS],
+        transaction: true,
+    })
+    .addStateDiff({
+        address: [BAYC_ADDRESS],
+        transaction: true,
+    })
     .setFields({
-        transaction: {
-            from: true,
-            value: true,
-            hash: true,
+        trace: {
+            callTo: true,
+            callFrom: true,
+            callSighash: true,
         },
-    })
-    .setBlockRange({
-        from: 6_000_000,
-    })
-    .addTransaction({
-        to: ['0x0000000000000000000000000000000000000000'],
     })
 
 export type Fields = EvmBatchProcessorFields<typeof processor>

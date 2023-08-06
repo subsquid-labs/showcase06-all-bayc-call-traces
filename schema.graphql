@@ -1,7 +1,25 @@
-type Burn @entity {
+type TransactionTouchingBayc @entity {
   id: ID!
-  block: Int!
-  address: String! @index
-  value: BigInt!
-  txHash: String!
+  block: Int! @index
+  txnHash: String! @index
+  from: String! @index
+  to: String! @index
+  calls: [IndirectCallToBayc!] @derivedFrom(field: "txn")
+  stateDiffs: [StateDiff!] @derivedFrom(field: "txn")
+}
+
+type IndirectCallToBayc @entity {
+  id: ID!
+  txn: TransactionTouchingBayc!
+  directCaller: String! @index
+  sighash: String! @index
+}
+
+type StateDiff @entity {
+  id: ID!
+  txn: TransactionTouchingBayc!
+  key: String! @index
+  kind: String!
+  prev: String
+  next: String
 }

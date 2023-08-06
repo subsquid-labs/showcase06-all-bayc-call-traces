@@ -1,29 +1,62 @@
 import {TypeormDatabase} from '@subsquid/typeorm-store'
-import {Burn} from './model'
-import {processor} from './processor'
+import {
+    TransactionTouchingBayc,
+    IndirectCallToBayc,
+    StateDiff,
+} from './model'
+import {processor, BAYC_ADDRESS} from './processor'
 
-processor.run(new TypeormDatabase({supportHotBlocks: true}), async (ctx) => {
-    const burns: Burn[] = []
-    for (let c of ctx.blocks) {
-        for (let tx of c.transactions) {
-            // decode and normalize the tx data
-            burns.push(
-                new Burn({
-                    id: tx.id,
-                    block: c.header.height,
-                    address: tx.from,
-                    value: tx.value,
-                    txHash: tx.hash,
-                })
-            )
+processor.run(new TypeormDatabase({supportHotBlocks: false}), async (ctx) => {
+    const transactions: Map<string, TransactionTouchingBayc> = new Map()
+    const calls: IndirectCallToBayc[] = []
+    const stateDiffs: StateDiff[] = []
+
+    for (let block of ctx.blocks) {
+        for (let trc of block.traces) {
+            if (trc.type === 'call' && trc.action.to === BAYC_ADDRESS && trc.transaction?.to !== BAYC_ADDRESS) {
+                if (!trc.transaction) {
+                    ctx.log.fatal(`ERROR: trace came without a parent transaction`)
+                    console.log(trc)
+                    process.exit(1)
+                }
+                let txnHash = trc.transaction.hash
+                if (!transactions.has(txnHash)) {
+                    transactions.set(txnHash, new TransactionTouchingBayc({
+                        id: trc.transaction.id,
+                        block: block.header.height,
+                        txnHash,
+                        from: trc.transaction.from,
+                        to: trc.transaction.to
+                    }))
+                }
+                calls.push(new IndirectCallToBayc({
+                    id: `${trc.transaction.id}-${trc.traceAddress.join('-')}`,
+                    txn: transactions.get(txnHash),
+                    directCaller: trc.action.from,
+                    sighash: trc.action.sighash
+                }))
+            }
+        }
+        for (let [idx, stdiff] of block.stateDiffs.entries()) {
+            if (!stdiff.transaction) {
+                ctx.log.fatal(`ERROR: state diff came without a parent transaction`)
+                console.log(stdiff)
+                process.exit(2)
+            }
+            if (stdiff.address === BAYC_ADDRESS && transactions.has(stdiff.transaction.hash)) {
+                stateDiffs.push(new StateDiff({
+                    id: `${stdiff.transaction.id}-${idx}`,
+                    txn: transactions.get(stdiff.transaction.hash),
+                    key: stdiff.key,
+                    kind: stdiff.kind,
+                    prev: stdiff.prev,
+                    next: stdiff.next
+                }))
+            }
         }
     }
-    // apply vectorized transformations and aggregations
-    const burned = burns.reduce((acc, b) => acc + b.value, 0n) / 1_000_000_000n
-    const startBlock = ctx.blocks.at(0)?.header.height
-    const endBlock = ctx.blocks.at(-1)?.header.height
-    ctx.log.info(`Burned ${burned} Gwei from ${startBlock} to ${endBlock}`)
 
-    // upsert batches of entities with batch-optimized ctx.store.save
-    await ctx.store.upsert(burns)
+    await ctx.store.upsert([...transactions.values()])
+    await ctx.store.upsert(calls)
+    await ctx.store.upsert(stateDiffs)
 })
