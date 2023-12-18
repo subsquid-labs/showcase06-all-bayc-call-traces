@@ -24,8 +24,8 @@ export class TransactionTouchingBayc {
     from!: string
 
     @Index_()
-    @Column_("text", {nullable: false})
-    to!: string
+    @Column_("text", {nullable: true})
+    to!: string | undefined | null
 
     @OneToMany_(() => IndirectCallToBayc, e => e.txn)
     calls!: IndirectCallToBayc[]

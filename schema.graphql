@@ -3,7 +3,7 @@ type TransactionTouchingBayc @entity {
   block: Int! @index
   txnHash: String! @index
   from: String! @index
-  to: String! @index
+  to: String @index
   calls: [IndirectCallToBayc!] @derivedFrom(field: "txn")
   stateDiffs: [StateDiff!] @derivedFrom(field: "txn")
 }
