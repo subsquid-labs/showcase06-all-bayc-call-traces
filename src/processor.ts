@@ -1,4 +1,3 @@
-import {lookupArchive} from '@subsquid/archive-registry'
 import {
     BlockHeader,
     DataHandlerContext,
@@ -12,7 +11,7 @@ export const BAYC_ADDRESS = '0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d'
 
 export const processor = new EvmBatchProcessor()
     .setDataSource({
-        archive: lookupArchive('eth-mainnet'),
+        archive: 'https://v2.archive.subsquid.io/network/ethereum-mainnet',
     })
     .setBlockRange({ from: 12_287_507 })
     .addTrace({
