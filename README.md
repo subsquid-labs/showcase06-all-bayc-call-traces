@@ -6,7 +6,7 @@ This squid scrapes indirect calls to the [BAYC NFT contract](https://etherscan.i
  * internal calls to BAYC (transaction, contract that directly calls BAYC, method sighash);
  * state diffs (transaction, storage key, diff kind, prev and next states).
 
-See more examples of requesting data with squids on the [showcase page](https://docs.subsquid.io/evm-indexing/configuration/showcase) of Subsquid documentation.
+See more examples of requesting data with squids on the [showcase page](https://docs.sqd.dev/en/sdk) of Subsquid documentation.
 
 Dependencies: Node.js, Docker.
 
