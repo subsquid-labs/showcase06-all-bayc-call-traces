@@ -1,21 +1,26 @@
+import {run} from '@subsquid/batch-processor'
+import {augmentBlock} from '@subsquid/evm-objects'
+import {createLogger} from '@subsquid/logger'
 import {TypeormDatabase} from '@subsquid/typeorm-store'
 import {
     TransactionTouchingBayc,
     IndirectCallToBayc,
     StateDiff,
 } from './model'
-import {processor, BAYC_ADDRESS} from './processor'
+import {dataSource, BAYC_ADDRESS} from './processor'
 
-processor.run(new TypeormDatabase({supportHotBlocks: false}), async (ctx) => {
+const log = createLogger('sqd:processor')
+
+run(dataSource, new TypeormDatabase({supportHotBlocks: true}), async (ctx) => {
     const transactions: Map<string, TransactionTouchingBayc> = new Map()
     const calls: IndirectCallToBayc[] = []
     const stateDiffs: StateDiff[] = []
 
-    for (let block of ctx.blocks) {
+    for (let block of ctx.blocks.map(augmentBlock)) {
         for (let trc of block.traces) {
             if (trc.type === 'call' && trc.action.to === BAYC_ADDRESS && trc.transaction?.to !== BAYC_ADDRESS) {
                 if (!trc.transaction) {
-                    ctx.log.fatal(`ERROR: trace came without a parent transaction`)
+                    log.fatal(`ERROR: trace came without a parent transaction`)
                     console.log(trc)
                     process.exit(1)
                 }
@@ -23,7 +28,7 @@ processor.run(new TypeormDatabase({supportHotBlocks: false}), async (ctx) => {
                 if (!transactions.has(txnHash)) {
                     transactions.set(txnHash, new TransactionTouchingBayc({
                         id: trc.transaction.id,
-                        block: block.header.height,
+                        block: block.header.number,
                         txnHash,
                         from: trc.transaction.from,
                         to: trc.transaction.to
@@ -39,7 +44,7 @@ processor.run(new TypeormDatabase({supportHotBlocks: false}), async (ctx) => {
         }
         for (let [idx, stdiff] of block.stateDiffs.entries()) {
             if (!stdiff.transaction) {
-                ctx.log.fatal(`ERROR: state diff came without a parent transaction`)
+                log.fatal(`ERROR: state diff came without a parent transaction`)
                 console.log(stdiff)
                 process.exit(2)
             }
